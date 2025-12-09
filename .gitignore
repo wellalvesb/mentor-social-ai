@@ -1,0 +1,18 @@
+# --- ARQUIVOS SECRETOS (NUNCA SUBIR) ---
+*.pem
+.env
+.env.local
+*.key
+
+# --- LIXO DE SISTEMA ---
+node_modules/
+venv/
+__pycache__/
+*.pyc
+.DS_Store
+.vscode/
+
+# --- SESSÃO DO WHATSAPP (SEGURANÇA) ---
+.wwebjs_auth/
+.wwebjs_cache/
+.wwebjs_run/
