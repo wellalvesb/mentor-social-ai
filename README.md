@@ -20,7 +20,6 @@ O projeto utiliza uma arquitetura híbrida de microsserviços hospedada no AWS E
 
 ```mermaid
 graph TD
-    %% Definição dos Componentes
     A[Usuário (Microempreendedor)]
     B(WhatsApp)
     C{Zap Bridge - Node.js}
@@ -103,4 +102,4 @@ node index.js
 ```
 
 ## 👨‍💻 Desenvolvedor
-Desenvolvido por Welton Alves. Focado em soluções em IA 
+Desenvolvido por Welton Alves.
