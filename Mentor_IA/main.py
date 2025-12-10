@@ -1,27 +1,28 @@
 import os
-import re
 import sqlite3
-import base64
 import uvicorn
-import edge_tts
-from datetime import datetime
-from typing import Optional
 from fastapi import FastAPI
 from pydantic import BaseModel
 from groq import Groq
+from typing import Optional
+import base64
 
+# --- CONFIGURAÇÃO GROQ (CÉREBRO E OUVIDOS) ---
+# Sua chave Groq (Válida para Textos e Áudios)
+# Substitua a linha da chave por isso antes de salvar:
 # --- CONFIGURAÇÃO ---
-api_key = os.environ.get("GROQ_API_KEY")
-client = Groq(api_key=api_key) if api_key else None
-
+# Chave Groq (Llama 3.3 + Whisper V3)
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "SUA_CHAVE_AQUI")
+client = Groq(api_key=GROQ_API_KEY)
+# --- PERSONALIDADE ---
 SYSTEM_PROMPT = """
 Você é o 'Júnior', um mentor de negócios amigo e popular.
-Ajude empreendedores de baixo letramento.
-
+Fale com empreendedores brasileiros simples.
 REGRAS:
-1. JAMAIS USE ASTERISCOS (*) ou formatação.
-2. Seja breve, direto e encorajador.
-3. Use o histórico da conversa para dar conselhos personalizados.
+1. Responda APENAS em texto.
+2. Seja breve, direto e use emojis moderadamente.
+3. NUNCA use formatação markdown (negrito ** ou itálico *), use apenas texto puro.
+4. Use o histórico da conversa para manter o contexto.
 """
 
 app = FastAPI()
@@ -30,13 +31,10 @@ app = FastAPI()
 def iniciar_banco():
     conn = sqlite3.connect('junior_memoria.db')
     cursor = conn.cursor()
-    # Cria a tabela se não existir
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS conversas (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id TEXT,
-            role TEXT,
-            content TEXT,
+            user_id TEXT, role TEXT, content TEXT,
             data_hora DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
@@ -46,132 +44,114 @@ def iniciar_banco():
 def salvar_mensagem(user_id, role, content):
     conn = sqlite3.connect('junior_memoria.db')
     cursor = conn.cursor()
-    cursor.execute('INSERT INTO conversas (user_id, role, content) VALUES (?, ?, ?)', 
-                  (user_id, role, content))
+    cursor.execute('INSERT INTO conversas (user_id, role, content) VALUES (?, ?, ?)', (user_id, role, content))
     conn.commit()
     conn.close()
 
-def recuperar_historico(user_id, limite=20):
+def recuperar_historico(user_id, limite=10):
     conn = sqlite3.connect('junior_memoria.db')
     cursor = conn.cursor()
-    # Pega as últimas X mensagens
-    cursor.execute('''
-        SELECT role, content FROM conversas 
-        WHERE user_id = ? 
-        ORDER BY id DESC LIMIT ?
-    ''', (user_id, limite))
+    cursor.execute('SELECT role, content FROM conversas WHERE user_id = ? ORDER BY id DESC LIMIT ?', (user_id, limite))
     mensagens = cursor.fetchall()
     conn.close()
     
-    # O banco devolve do mais novo pro mais velho, precisamos inverter
-    historico_formatado = [{"role": m[0], "content": m[1]} for m in mensagens]
-    return historico_formatado[::-1] # Inverte a lista
+    # Formata para a Groq (user/system/assistant)
+    historico = []
+    for m in mensagens[::-1]:
+        # Converte nomes de roles se necessário
+        role = m[0]
+        if role == "model": role = "assistant" 
+        historico.append({"role": role, "content": m[1]})
+    return historico
 
-# Inicia o banco assim que o código carrega
+# Inicia o banco
 iniciar_banco()
 
 class ZapMessage(BaseModel):
     user_id: str
-    message: Optional[str] = None 
-    text: Optional[str] = None    
+    message: Optional[str] = None
+    text: Optional[str] = None
     audio_base64: Optional[str] = None
-
-# --- LIMPEZA E VOZ ---
-def limpar_texto_para_audio(texto):
-    if not texto: return ""
-    texto = re.sub(r'\*.*?\*', '', texto)
-    texto = texto.replace('*', '').replace('#', '').replace('_', '')
-    texto = re.sub(r'\s+', ' ', texto).strip()
-    return texto
-
-async def gerar_voz(texto):
-    try:
-        texto_limpo = limpar_texto_para_audio(texto)
-        if not texto_limpo: texto_limpo = "Entendi."
-        
-        comunicar = edge_tts.Communicate(texto_limpo, "pt-BR-AntonioNeural")
-        filename = f"resp_{os.getpid()}.mp3"
-        await comunicar.save(filename)
-        return filename
-    except Exception as e:
-        print(f"⚠️ Erro TTS: {e}")
-        return None
 
 # --- ROTA PRINCIPAL ---
 @app.post("/chat")
 async def chat_endpoint(dados: ZapMessage):
     user_id = dados.user_id
-    # Pega texto de qualquer campo que vier
     texto_usuario = dados.message or dados.text or ""
     
-    print(f"\n📩 Mensagem de {user_id}")
+    print(f"\n📩 Mensagem recebida de {user_id}")
 
-    # 1. PROCESSAR ÁUDIO (Se houver)
+    # 1. TRANSCRIÇÃO DE ÁUDIO (Groq Whisper)
     if dados.audio_base64:
+        print("🎤 Áudio detectado! Transcrevendo...")
         try:
-            b64 = dados.audio_base64.split(",")[1] if "," in dados.audio_base64 else dados.audio_base64
-            arquivo_temp = "temp_audio.ogg"
+            # Limpa o base64
+            b64_clean = dados.audio_base64
+            if "," in b64_clean:
+                b64_clean = b64_clean.split(",")[1]
+            
+            # Salva temporário
+            arquivo_temp = f"temp_{user_id}.ogg"
             with open(arquivo_temp, "wb") as f:
-                f.write(base64.b64decode(b64))
+                f.write(base64.b64decode(b64_clean))
+            
+            # Transcreve
             with open(arquivo_temp, "rb") as arquivo_audio:
                 transcricao = client.audio.transcriptions.create(
-                    file=(arquivo_temp, arquivo_audio),
+                    file=("audio.ogg", arquivo_audio),
                     model="whisper-large-v3",
                     language="pt"
                 )
             texto_usuario = transcricao.text
-            print(f"📝 Ouvido: {texto_usuario}")
-        except Exception:
-            return {"response_text": "Não consegui ouvir...", "audio_response": None}
+            print(f"📝 Transcrição: {texto_usuario}")
+            
+            if os.path.exists(arquivo_temp):
+                os.remove(arquivo_temp)
+            
+        except Exception as e:
+            print(f"❌ Erro transcrição: {e}")
+            return {"response_text": "Não consegui ouvir o áudio. Pode escrever?", "audio_response": None}
 
     if not texto_usuario:
         return {"response_text": "...", "audio_response": None}
 
-    # 2. INTELIGÊNCIA COM MEMÓRIA ETERNA
+    # 2. INTELIGÊNCIA (Groq Llama 3.3)
     try:
-        # A) Salva o que o usuário disse no banco
+        # Salva msg do usuário
         salvar_mensagem(user_id, "user", texto_usuario)
-
-        # B) Busca o histórico recente (últimas 20 trocas) para dar contexto
-        historico = recuperar_historico(user_id, limite=20)
         
-        # C) Monta o prompt
-        mensagens_para_enviar = [{"role": "system", "content": SYSTEM_PROMPT}] + historico
+        # Recupera histórico
+        historico = recuperar_historico(user_id)
+        
+        # Monta as mensagens (Sistema + Histórico + Nova Mensagem)
+        mensagens_envio = [{"role": "system", "content": SYSTEM_PROMPT}] + historico
+        # Se a última mensagem do histórico não for a atual (caso já tenha salvo), não adiciona duplicado
+        # Mas no nosso fluxo, salvamos antes e recuperamos. O recuperar pega a atual. 
+        # Ajuste seguro: adicionar a mensagem atual explicitamente se ela não veio no histórico
+        if not historico or historico[-1]['content'] != texto_usuario:
+             mensagens_envio.append({"role": "user", "content": texto_usuario})
 
-        # D) Chama a IA
-        completion = client.chat.completions.create(
-            messages=mensagens_para_enviar,
+        # Chama a Groq
+        chat_completion = client.chat.completions.create(
+            messages=mensagens_envio,
+            # ESTE É O MODELO NOVO E ESTÁVEL (O antigo foi desligado)
             model="llama-3.3-70b-versatile",
-            temperature=0.7 
+            temperature=0.7,
+            max_tokens=300
         )
-        resposta_texto = completion.choices[0].message.content
         
-        # E) Salva a resposta da IA no banco
+        resposta_texto = chat_completion.choices[0].message.content
+        
+        # Salva resposta
         salvar_mensagem(user_id, "assistant", resposta_texto)
-        
-        print(f"🤖 Resposta: {resposta_texto}")
+        print(f"🤖 Resposta Groq: {resposta_texto}")
+
+        return {"response_text": resposta_texto, "audio_response": None}
 
     except Exception as e:
-        erro = f"Erro IA: {str(e)}"
-        print(erro)
-        return {"response_text": erro, "audio_response": None}
-
-    # 3. GERAR VOZ
-    audio_b64 = None
-    try:
-        if resposta_texto:
-            arquivo_mp3 = await gerar_voz(resposta_texto)
-            if arquivo_mp3:
-                with open(arquivo_mp3, "rb") as f:
-                    audio_b64 = base64.b64encode(f.read()).decode('utf-8')
-                os.remove(arquivo_mp3)
-    except Exception:
-        pass
-
-    return {
-        "response_text": resposta_texto,
-        "audio_response": audio_b64
-    }
+        print(f"❌ Erro Groq: {str(e)}")
+        # Se der erro de modelo de novo, fallback para o instant (mais rápido)
+        return {"response_text": "Tive um lapso de memória, pode repetir?", "audio_response": None}
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="127.0.0.1", port=5000)
+    uvicorn.run(app, host="0.0.0.0", port=5000)
