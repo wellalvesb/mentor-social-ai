@@ -1,121 +1,106 @@
 # 🤖 Mentor Social AI — Inclusão Digital via WhatsApp
 
-> **Inclusão Digital na Prática:** Um assistente de IA que ouve, entende e orienta microempreendedores de baixo letramento, rodando 100% na nuvem AWS.
+> Um assistente de IA projetado para democratizar o acesso à consultoria de negócios para microempreendedores com baixo letramento digital.
 
-![Status](https://img.shields.io/badge/Status-Online_na_AWS-green?style=for-the-badge&logo=amazonaws)
-![Python](https://img.shields.io/badge/Backend-FastAPI-blue?style=for-the-badge&logo=python)
-![Node](https://img.shields.io/badge/Bridge-Node.js-green?style=for-the-badge&logo=nodedotjs)
-![AI](https://img.shields.io/badge/AI-Llama_3.3_70B-purple?style=for-the-badge&logo=openai)
+![Status](https://img.shields.io/badge/Status-Online_na_AWS-green)
+![Python](https://img.shields.io/badge/Python-FastAPI-blue)
+![AI](https://img.shields.io/badge/AI-Llama_3.3_70B-purple)
 
 ## 💡 O Problema
-A IA generativa é poderosa, mas excludente. Milhões de microempreendedores no Brasil possuem **baixo letramento digital** ou dificuldades de leitura, o que os impede de usar ferramentas baseadas em texto (prompts complexos). Isso cria um abismo de acesso à tecnologia.
+Milhões de brasileiros têm ótimas ideias de negócio, mas encontram barreiras no uso de ferramentas digitais complexas ou baseadas puramente em texto. A IA Generativa é poderosa, mas muitas vezes inacessível.
 
 ## 🚀 A Solução
-O **Mentor Social AI** elimina essa barreira, funcionando como um "Consultor de Negócios de Bolso" acessível via **áudio** na plataforma mais popular do país: o WhatsApp.
-
-**O Fluxo Simplificado:**
-1.  🗣️ **Usuário:** Grava um áudio com sua dúvida (ex: *"Como precifico meu bolo?"*).
-2.  👂 **Ouve:** O sistema transcreve o áudio com alta precisão (**Whisper V3**).
-3.  🧠 **Pensa:** O modelo **Llama 3.3** analisa o contexto e gera uma orientação prática.
-4.  💬 **Responde:** O usuário recebe a resposta em texto claro, empático e direto no WhatsApp.
-
----
+O **Mentor Social AI** funciona diretamente no WhatsApp. O usuário envia um **áudio** com sua dúvida (ex: "Como precifico meu bolo?"), e o sistema:
+1.  **Ouve** (Transcreve o áudio usando Whisper V3).
+2.  **Pensa** (Processa a resposta com Llama 3.3 focado em linguagem simples e empática).
+3.  **Responde** em texto claro e direto no WhatsApp.
 
 ## 🛠️ Arquitetura Técnica
-
-O projeto utiliza uma arquitetura híbrida de microsserviços hospedada na **AWS EC2**, garantindo alta disponibilidade e baixo custo.
+O projeto utiliza uma arquitetura híbrida de microsserviços hospedada no AWS EC2, garantindo alta disponibilidade e baixo custo.
 
 ```mermaid
 graph TD
-    User([👤 Usuário]) -- Áudio (Ogg) --> Zap[🟢 Zap Bridge\n(Node.js + whatsapp-web.js)]
-    
-    subgraph AWS Cloud [☁️ AWS EC2 (Ubuntu 24.04)]
-        Zap -- POST JSON + Base64 --> Mentor[🔵 Mentor_IA\n(Python FastAPI)]
-        Mentor -- Salva/Lê --> DB[(🗄️ SQLite\nHistórico)]
-    end
-    
-    subgraph Groq Cloud [⚡ Groq API (Inference)]
-        Mentor -- 1. Envia Áudio --> Whisper(👂 Whisper V3\nSpeech-to-Text)
-        Whisper -- 2. Retorna Texto --> Mentor
-        Mentor -- 3. Envia Contexto --> Llama(🧠 Llama 3.3\nLLM 70B)
-        Llama -- 4. Retorna Resposta --> Mentor
-    end
-    
-    Mentor -- 5. Resposta Texto --> Zap
-    Zap -- 6. Envia Msg --> User
+    %% Definição dos Componentes
+    A[Usuário (Microempreendedor)]
+    B(WhatsApp)
+    C{Zap Bridge - Node.js}
+    D[Mentor IA - FastAPI]
+    E[junior_memoria.db - SQLite]
+    F[Groq API - Whisper V3]
+    G[Groq API - Llama 3.3 70B]
 
-    💻 Tecnologias Utilizadas
-Infraestrutura & DevOps
-AWS EC2 (t3.micro): Servidor Linux Ubuntu 24.04.
+    %% Fluxo de Entrada (Áudio)
+    A -- Envia Áudio (Dúvida) --> B
+    B -- Recebe Mensagem --> C
+    C -- Envia para Processamento --> D
 
-PM2: Gerenciador de processos para manter a aplicação online 24/7.
+    %% Processamento de Transcrição
+    D -- 1. Solicita Transcrição --> F
+    F -- 2. Retorna Texto Transcrito --> D
 
-SSH: Acesso remoto seguro.
+    %% Processamento de Resposta
+    D -- 3. Consulta Histórico --> E
+    E -- Retorna Histórico --> D
+    D -- 4. Solicita Resposta --> G
+    G -- 5. Retorna Resposta (Texto) --> D
 
-Backend (Cérebro)
-Python 3.10+ & FastAPI: API rápida e assíncrona.
+    %% Fluxo de Saída (Resposta)
+    D -- Envia Resposta Final --> C
+    C -- Envia Mensagem --> B
+    B -- Recebe Resposta --> A
+```
 
-Groq SDK: Para inferência de IA com latência ultrabaixa.
+### ⚙️ Tecnologias Utilizadas
 
-SQLite: Persistência de memória de conversação.
+#### Infraestrutura e DevOps
+*   **AWS EC2 (t3.micro):** Servidor Linux Ubuntu 24.04.
+*   **PM2:** Gerenciador de processos para manter a aplicação online 24 horas por dia, 7 dias por semana.
+*   **SSH:** Acesso remoto seguro.
 
-Interface (Bridge)
-Node.js: Runtime leve.
+#### Backend (Cérebro)
+*   **Linguagem:** Python 3.11
+*   **Framework:** FastAPI
+*   **LLM:** Groq API (Llama-3.3-70b-versatile)
+*   **Speech-to-Text:** Groq API (Whisper Large V3)
+*   **Banco de Dados:** SQLite (junior_memoria.db)
 
-Whatsapp-web.js: Biblioteca para automação do WhatsApp.
+#### Interface (Bridge)
+*   **Linguagem:** Node.js
+*   **Biblioteca:** whatsapp-web.js
 
-Puppeteer: Navegador headless para autenticação via QR Code.
+## 📂 Estrutura do Projeto
+```bash
+├── Mentor_IA/          # Backend Python (FastAPI)
+│   ├── main.py         # Lógica de IA e Transcrição
+│   └── junior_memoria.db # Banco de dados SQLite (Histórico)
+├── Zap_Bridge/         # Serviço Node.js
+│   └── index.js        # Conexão com WhatsApp
+└── README.md
+```
 
-📂 Estrutura do Projeto
-├── Mentor_IA/          # Microsserviço Python (Cérebro)
-│   ├── main.py         # Lógica de IA, Rotas e Transcrição
-│   ├── junior_memoria.db # Banco de dados (Histórico)
-│   └── requirements.txt # Dependências (fastapi, groq, uvicorn)
-│
-├── Zap_Bridge/         # Microsserviço Node.js (Interface)
-│   ├── index.js        # Conexão Socket com WhatsApp
-│   └── package.json    # Dependências (whatsapp-web.js, axios)
-│
-└── README.md           # Documentação
+## 🔧 Como Rodar Localmente
+Clone o repositório
 
-🔧 Como Rodar Localmente
-Pré-requisitos
-Python 3.10+
+```bash
+git clone https://github.com/wellalvesb/mentor-social-ai.git
+```
 
-Node.js 18+
+### Backend (Python)
 
-Chave de API da Groq Cloud
-
-1. Clone o Repositório
-Bash
-
-git clone [https://github.com/wellalvesb/mentor-social-ai.git](https://github.com/wellalvesb/mentor-social-ai.git)
-cd mentor-social-ai
-2. Backend (Python)
-Bash
-
+```bash
 cd Mentor_IA
-# Cria e ativa o ambiente virtual
-python -m venv venv
-# Windows: venv\Scripts\activate | Linux: source venv/bin/activate
-
-# Instala dependências
 pip install -r requirements.txt
-
-# Configura a Chave (Linux/Mac) ou use $env: no Windows
-export GROQ_API_KEY="sua_chave_aqui"
-
-# Roda o servidor na porta 5000
+# Adicione sua chave GROQ no código ou variável de ambiente
 python main.py
-3. Bridge (Node.js)
-Em outro terminal:
+```
 
-Bash
+### Bridge (Node.js)
 
+```bash
 cd Zap_Bridge
 npm install
 node index.js
-Escaneie o QR Code que aparecerá no terminal com seu WhatsApp.
+```
 
-👨‍💻 Desenvolvedor
-Desenvolvido por Welton Alves 
+## 👨‍💻 Desenvolvedor
+Desenvolvido por Welton Alves. Focado em soluções em IA 
