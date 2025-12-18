@@ -20,7 +20,8 @@ O projeto utiliza uma arquitetura híbrida de microsserviços hospedada no AWS E
 
 ```mermaid
 graph TD
-    A[Usuário (Microempreendedor)]
+    %% Definição dos Componentes
+    A[Usuário Microempreendedor]
     B(WhatsApp)
     C{Zap Bridge - Node.js}
     D[Mentor IA - FastAPI]
@@ -28,22 +29,22 @@ graph TD
     F[Groq API - Whisper V3]
     G[Groq API - Llama 3.3 70B]
 
-    %% Fluxo de Entrada (Áudio)
-    A -- Envia Áudio (Dúvida) --> B
+    %% Fluxo de Entrada
+    A -- Envia Áudio --> B
     B -- Recebe Mensagem --> C
     C -- Envia para Processamento --> D
 
-    %% Processamento de Transcrição
+    %% Transcrição
     D -- 1. Solicita Transcrição --> F
-    F -- 2. Retorna Texto Transcrito --> D
+    F -- 2. Retorna Texto --> D
 
-    %% Processamento de Resposta
+    %% Inteligência
     D -- 3. Consulta Histórico --> E
-    E -- Retorna Histórico --> D
+    E -- Retorna Contexto --> D
     D -- 4. Solicita Resposta --> G
-    G -- 5. Retorna Resposta (Texto) --> D
+    G -- 5. Retorna Resposta Texto --> D
 
-    %% Fluxo de Saída (Resposta)
+    %% Saída
     D -- Envia Resposta Final --> C
     C -- Envia Mensagem --> B
     B -- Recebe Resposta --> A
