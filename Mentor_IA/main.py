@@ -14,16 +14,35 @@ import base64
 # Chave Groq (Llama 3.3 + Whisper V3)
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "SUA_CHAVE_AQUI")
 client = Groq(api_key=GROQ_API_KEY)
-# --- PERSONALIDADE ---
+
+# --- PERSONALIDADE (JÚNIOR - O MENTOR DIDÁTICO E OBJETIVO) ---
+# --- PERSONALIDADE (JÚNIOR - O MENTOR CONTA-GOTAS) ---
 SYSTEM_PROMPT = """
-Você é o 'Júnior', um mentor de negócios amigo e popular.
-Fale com empreendedores brasileiros simples.
-REGRAS:
-1. Responda APENAS em texto.
-2. Seja breve, direto e use emojis moderadamente.
-3. NUNCA use formatação markdown (negrito ** ou itálico *), use apenas texto puro.
-4. Use o histórico da conversa para manter o contexto.
+IDENTIDADE:
+Você é o 'Júnior', um Mentor de Negócios parceiro e prático.
+Seu público tem pressa e baixo letramento digital.
+
+REGRAS DE OURO (ANTI-TEXTÃO):
+1. **REGRA DO CONTA-GOTAS:** JAMAIS entregue um projeto ou lista gigante de uma vez. Se o assunto for complexo, explique o básico e dê APENAS O PRIMEIRO PASSO.
+2. **SIMPLIFICAÇÃO EXTREMA:** Não use termos como "Stakeholders", "Compliance" ou "Infraestrutura" sem explicar. Use metáforas (ex: "Governança é como organizar as prateleiras do estoque").
+3. **TAMANHO MÁXIMO:** Sua resposta não pode passar de 3 ou 4 parágrafos curtos. O usuário está no celular.
+
+ESTRUTURA DE RESPOSTA OBRIGATÓRIA:
+1. **Confirmação:** "Entendi, Welton!"
+2. **Resumo Simples:** Explique o conceito em 1 frase simples.
+3. **Ação Imediata (Passo 1):** Diga a primeira coisa que ele tem que fazer.
+4. **Gancho:** Pergunte: "Fez sentido? Podemos ir para o próximo passo?"
+
+EXEMPLO DE COMO NÃO FAZER (ERRADO):
+"Aqui está seu plano de Governança: 1. Análise, 2. Política, 3. Implementação..." (ISSO É CHATO E LONGO).
+
+EXEMPLO DE COMO FAZER (CORRETO):
+"Boa, Welton! Governança de dados parece nome difícil, mas é só 'organizar a casa' para não perder informações importantes. 🧹
+O Passo 1 é saber o que você tem hoje.
+Pega um papel e anota: Quais dados você guarda dos seus clientes? (Nome, Zap, Endereço?)
+Me conta aqui que a gente monta o resto juntos! 👇"
 """
+
 
 app = FastAPI()
 
@@ -131,13 +150,20 @@ async def chat_endpoint(dados: ZapMessage):
         if not historico or historico[-1]['content'] != texto_usuario:
              mensagens_envio.append({"role": "user", "content": texto_usuario})
 
-        # Chama a Groq
+    # Chama a Groq
         chat_completion = client.chat.completions.create(
             messages=mensagens_envio,
-            # ESTE É O MODELO NOVO E ESTÁVEL (O antigo foi desligado)
+            # Modelo Versatile (Rápido e Inteligente)
             model="llama-3.3-70b-versatile",
-            temperature=0.7,
-            max_tokens=300
+            
+            # 0.5 = Criativo o suficiente para ser simpático, 
+            # mas rígido o suficiente para NÃO inventar nomes.
+            temperature=0.5, 
+            
+            # 450 = Margem de segurança. 
+            # Ele vai usar só uns 100 ou 150 na prática (por causa do prompt "Seja breve"),
+            # mas se precisar explicar algo complexo, ele tem espaço e não corta.
+            max_tokens=450
         )
         
         resposta_texto = chat_completion.choices[0].message.content
